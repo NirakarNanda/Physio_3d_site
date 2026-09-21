@@ -6,7 +6,7 @@ import { ScrollTrigger, initScroll } from "@/lib/scroll";
 import { anatomyStore } from "@/lib/anatomyStore";
 import { ANATOMY_TRACK_VH } from "@/components/anatomy/anatomyData";
 import { AnatomyLabels } from "@/components/anatomy/AnatomyLabels";
-import { SkullExplodedLabels } from "@/components/anatomy/SkullExplodedLabels";
+import { ExplodedLabels } from "@/components/anatomy/ExplodedLabels";
 import { useReducedMotion } from "@/components/anatomy/useReducedMotion";
 
 // The Canvas touches window/WebGL — keep it out of the server bundle.
@@ -52,7 +52,7 @@ export function AnatomyExperience() {
       <div className="sticky top-0 h-screen viewport-full w-full overflow-hidden">
         <AnatomyScene />
         <AnatomyLabels />
-        <SkullExplodedLabels />
+        <ExplodedLabels />
 
         {/* Content required for screen readers / no-motion users lives here
             too, so no information exists only inside the 3D animation

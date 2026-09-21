@@ -2,30 +2,33 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { anatomyStore } from "@/lib/anatomyStore";
-import { skullExplosionState } from "@/lib/skullExplosion";
+import { explosionState } from "@/lib/explosion";
 import { anatomySections } from "./anatomyData";
-import { SKULL_LABELS } from "./skullExplode";
+import { getExplodeConfig, type ExplodeSectionConfig } from "./explodeView";
 import { useReducedMotion } from "./useReducedMotion";
 
 /**
- * Vertical slots for the labels, as fractions of viewport height
- * (top → bottom), matching the exploded parts' top-to-bottom order so
- * leader lines never cross.
+ * Vertical slot for a label, as a fraction of viewport height. Labels are
+ * spread evenly across the rail; every section's label defs are ordered
+ * top → bottom to match their exploded positions so leader lines never
+ * cross.
  */
-const SLOT_Y = [0.3, 0.375, 0.45, 0.525, 0.6, 0.675, 0.75];
-/** Horizontal rail the labels sit on, as a fraction of viewport width. */
-const RAIL_X = 0.8;
+function slotY(i: number, n: number): number {
+  return n === 1 ? 0.5 : 0.3 + (0.45 * i) / (n - 1);
+}
 
 /**
- * Neoconda-style exploded-view callouts for the skull: thin leader lines
- * with a dot at each part, running to numbered labels on the right rail.
- * Positions are updated imperatively in a rAF loop from the shared
+ * Neoconda-style exploded-view callouts: thin leader lines with a dot at
+ * each part, running to numbered labels on a side rail. One instance serves
+ * every anatomy section — the active section's config picks the group, the
+ * labels, and which screen edge the rail sits on (always opposite the text
+ * panel). Positions are updated imperatively in a rAF loop from the shared
  * per-frame explosion state — no React re-renders at scroll speed.
  *
  * Decorative for assistive tech: the same structures are already named in
  * the key-structure chips and the sr-only summary, so this is aria-hidden.
  */
-export function SkullExplodedLabels() {
+export function ExplodedLabels() {
   const sectionIndex = useSyncExternalStore(
     anatomyStore.subscribe,
     anatomyStore.getSectionIndex,
@@ -34,13 +37,19 @@ export function SkullExplodedLabels() {
   const reducedMotion = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const isSkull = anatomySections[sectionIndex]?.id === "skull";
+  const sectionId = anatomySections[sectionIndex]?.id;
+  const cfg: ExplodeSectionConfig | undefined = sectionId
+    ? getExplodeConfig(sectionId)
+    : undefined;
 
   useEffect(() => {
     const root = rootRef.current;
     const svg = svgRef.current;
-    if (!root || !svg || !isSkull || reducedMotion) return;
+    if (!root || !svg || !cfg || reducedMotion) return;
 
+    const labels = cfg.labels;
+    const n = labels.length;
+    const leftRail = cfg.railSide === "left";
     const labelEls = Array.from(
       root.querySelectorAll<HTMLElement>("[data-explode-label]")
     );
@@ -54,7 +63,10 @@ export function SkullExplodedLabels() {
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      const st = skullExplosionState;
+      const st = explosionState;
+      // A fast scroll can swap sections mid-frame; only draw anchors that
+      // belong to this section's label set.
+      if (st.sectionId !== cfg.sectionId) return;
       const f = st.factor;
       const W = st.width;
       const H = st.height;
@@ -63,16 +75,20 @@ export function SkullExplodedLabels() {
       root.style.opacity = f < 0.02 ? "0" : String(Math.min(1, f * 1.5));
       root.style.visibility = f < 0.02 ? "hidden" : "visible";
 
-      const railX = W * RAIL_X;
-      for (let i = 0; i < SKULL_LABELS.length; i++) {
+      const railX = W * (leftRail ? 0.2 : 0.8);
+      for (let i = 0; i < n; i++) {
         const anchor = st.anchors[i];
         const label = labelEls[i];
         const line = lineEls[i];
         const dot = dotEls[i];
         if (!anchor || !label || !line || !dot) continue;
 
-        const slotY = H * SLOT_Y[i];
-        label.style.transform = `translate(${railX + 14}px, ${slotY - 9}px)`;
+        const sy = H * slotY(i, n);
+        // Right rail: labels start just right of the rail, left-aligned.
+        // Left rail: labels end just left of the rail, right-aligned.
+        label.style.transform = leftRail
+          ? `translate(${railX - 14}px, ${sy}px) translate(-100%, -50%)`
+          : `translate(${railX + 14}px, ${sy}px) translateY(-50%)`;
 
         if (!anchor.visible) {
           line.setAttribute("points", "");
@@ -82,12 +98,12 @@ export function SkullExplodedLabels() {
         const ax = anchor.x;
         const ay = anchor.y;
         // Short horizontal stub out of the part, then a diagonal run to the
-        // label — the classic technical-illustration elbow.
-        const elbowX = Math.min(ax + 36, railX - 60);
-        line.setAttribute(
-          "points",
-          `${ax},${ay} ${elbowX},${ay} ${railX - 12},${slotY} ${railX - 5},${slotY}`
-        );
+        // label — the classic technical-illustration elbow, mirrored for the
+        // left rail.
+        const points = leftRail
+          ? `${ax},${ay} ${Math.max(ax - 36, railX + 60)},${ay} ${railX + 12},${sy} ${railX + 5},${sy}`
+          : `${ax},${ay} ${Math.min(ax + 36, railX - 60)},${ay} ${railX - 12},${sy} ${railX - 5},${sy}`;
+        line.setAttribute("points", points);
         dot.setAttribute("cx", String(ax));
         dot.setAttribute("cy", String(ay));
         dot.setAttribute("r", "2.5");
@@ -95,9 +111,9 @@ export function SkullExplodedLabels() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [isSkull, reducedMotion]);
+  }, [cfg, reducedMotion]);
 
-  if (!isSkull || reducedMotion) return null;
+  if (!cfg || reducedMotion) return null;
 
   return (
     <div
@@ -106,7 +122,7 @@ export function SkullExplodedLabels() {
       className="pointer-events-none absolute inset-0 z-10 hidden opacity-0 md:block"
     >
       <svg ref={svgRef} className="absolute inset-0 h-full w-full">
-        {SKULL_LABELS.map((def) => (
+        {cfg.labels.map((def) => (
           <g key={def.id}>
             <polyline
               data-explode-line
@@ -127,13 +143,17 @@ export function SkullExplodedLabels() {
           </g>
         ))}
       </svg>
-      {SKULL_LABELS.map((def) => (
+      {cfg.labels.map((def) => (
         <div
           key={def.id}
           data-explode-label
           className="absolute left-0 top-0 will-change-transform"
         >
-          <span className="whitespace-nowrap font-body text-[10px] uppercase tracking-label text-ink">
+          <span
+            className={`whitespace-nowrap font-body text-[10px] uppercase tracking-label text-ink ${
+              cfg.railSide === "left" ? "text-right" : ""
+            }`}
+          >
             <span className="mr-2 text-accent">{def.index}</span>
             {def.title}
           </span>
