@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { useReducedMotion } from "./useReducedMotion";
 import { AnatomyLoader } from "./AnatomyLoader";
 import { AnatomyErrorBoundary, AnatomyUnavailableMessage } from "./AnatomyErrorBoundary";
@@ -70,17 +72,27 @@ export function AnatomyScene() {
       camera={{ fov: 32, near: 0.1, far: 50, position: [0, 1.05, 4.4] }}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       shadows
+      onCreated={({ gl, scene }) => {
+        // Studio-style image-based lighting, generated locally at runtime
+        // (no network HDR fetch). Gives the ivory bone its soft, realistic
+        // sheen; kept subtle so the key light still models the forms.
+        const pmrem = new THREE.PMREMGenerator(gl);
+        scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        scene.environmentIntensity = 0.5;
+        pmrem.dispose();
+      }}
     >
       <color attach="background" args={["#F7F5F0"]} />
-      <hemisphereLight args={["#FFFDF8", "#D9D2C4", 0.65]} />
+      <hemisphereLight args={["#FFFDF8", "#D9D2C4", 0.35]} />
       <directionalLight
         position={[2.2, 3.2, 2.4]}
-        intensity={1.15}
+        intensity={1.35}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0005}
       />
-      <directionalLight position={[-2, 1.4, -1.6]} intensity={0.35} color="#E7DFCE" />
+      <directionalLight position={[-2.2, 2.0, -2.2]} intensity={0.55} color="#E2E8F2" />
+      <directionalLight position={[0, 0.6, 2.5]} intensity={0.22} color="#FFF6E8" />
 
       <Suspense fallback={<AnatomyLoader />}>
         <group scale={MODEL_SCALE} position={[0, MODEL_Y_OFFSET, 0]}>

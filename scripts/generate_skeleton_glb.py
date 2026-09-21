@@ -252,6 +252,118 @@ def make_tube(points, radius, radial_segments=7, samples_per_segment=10):
     )
 
 
+def make_torus(R, r, tubular_segments=20, radial_segments=10):
+    """Torus in the XY plane (axis = +Z), centered at origin."""
+    positions, normals = [], []
+    for i in range(tubular_segments + 1):
+        u = 2 * np.pi * i / tubular_segments
+        cu, su = np.cos(u), np.sin(u)
+        for j in range(radial_segments + 1):
+            v = 2 * np.pi * j / radial_segments
+            cv, sv = np.cos(v), np.sin(v)
+            positions.append(((R + r * cv) * cu, (R + r * cv) * su, r * sv))
+            normals.append((cv * cu, cv * su, sv))
+    indices = []
+    ring = radial_segments + 1
+    for i in range(tubular_segments):
+        for j in range(radial_segments):
+            a = i * ring + j
+            b = (i + 1) * ring + j
+            indices += [(a, b, a + 1), (a + 1, b, b + 1)]
+    return (
+        np.array(positions, dtype=np.float32),
+        np.array(normals, dtype=np.float32),
+        np.array(indices, dtype=np.int64),
+    )
+
+
+def merge_geos(geos):
+    """Concatenate several geometries into one mesh (winding preserved)."""
+    positions, normals, indices = [], [], []
+    offset = 0
+    for pos, nrm, idx in geos:
+        positions.append(np.asarray(pos, dtype=np.float32))
+        normals.append(np.asarray(nrm, dtype=np.float32))
+        indices.append(np.asarray(idx, dtype=np.int64).reshape(-1, 3) + offset)
+        offset += np.asarray(pos).shape[0]
+    return (
+        np.concatenate(positions),
+        np.concatenate(normals),
+        np.concatenate(indices),
+    )
+
+
+def make_curved_plate(w, h, t, R, nu=12, nv=8, taper_bottom=1.0):
+    """Plate of width w bent around the Y axis with radius R (edges sweep
+    toward -Z), height h, thickness t. The convex face points +Z at center —
+    used for the iliac blades of the pelvis. taper_bottom < 1 narrows the
+    plate toward its bottom edge (fan shape of the iliac blade)."""
+    positions, normals, indices = [], [], []
+    spread = w / R
+
+    def frame(fu, fv):
+        wscale = taper_bottom + (1.0 - taper_bottom) * fv
+        a = (fu - 0.5) * spread * wscale
+        sa, ca = np.sin(a), np.cos(a)
+        center = (R * sa, (fv - 0.5) * h, -R * (1 - ca))
+        return center, (sa, 0.0, ca), a
+
+    def vert(fu, fv, side, normal):
+        (cx, cy, cz), (nx, _ny, nz) = frame(fu, fv)[:2]
+        positions.append((cx + nx * side * t / 2, cy, cz + nz * side * t / 2))
+        normals.append(normal)
+        return len(positions) - 1
+
+    for side in (1, -1):  # convex face, then concave face
+        grid = []
+        for iv in range(nv + 1):
+            row = []
+            for iu in range(nu + 1):
+                fu, fv = iu / nu, iv / nv
+                _, (nx, _ny, nz), _ = frame(fu, fv)
+                row.append(vert(fu, fv, side, (nx * side, 0.0, nz * side)))
+            grid.append(row)
+        for iv in range(nv):
+            for iu in range(nu):
+                a, b = grid[iv][iu], grid[iv][iu + 1]
+                c, d = grid[iv + 1][iu], grid[iv + 1][iu + 1]
+                indices += [(a, b, c), (b, d, c)] if side == 1 else [(a, c, b), (b, c, d)]
+
+    def strip(edge, normal_fn):
+        # Edge strips duplicate the boundary verts with the edge normal so
+        # shading stays crisp; winding auto-corrected like make_tube caps.
+        f_idx = [vert(fu, fv, 1, normal_fn(fu, fv)) for fu, fv in edge]
+        b_idx = [vert(fu, fv, -1, normal_fn(fu, fv)) for fu, fv in edge]
+        for k in range(len(edge) - 1):
+            for tri in ((f_idx[k], f_idx[k + 1], b_idx[k]),
+                        (b_idx[k], f_idx[k + 1], b_idx[k + 1])):
+                v0 = np.array(positions[tri[0]])
+                v1 = np.array(positions[tri[1]])
+                v2 = np.array(positions[tri[2]])
+                fn = np.cross(v1 - v0, v2 - v0)
+                dn = np.array(normal_fn(*edge[k]), dtype=np.float64)
+                if float(np.dot(fn, dn)) < 0:
+                    tri = (tri[0], tri[2], tri[1])
+                indices.append(tri)
+
+    top = [(iu / nu, 1.0) for iu in range(nu + 1)]
+    bottom = [(iu / nu, 0.0) for iu in range(nu + 1)]
+    left = [(0.0, iv / nv) for iv in range(nv + 1)]
+    right = [(1.0, iv / nv) for iv in range(nv + 1)]
+    def _edge_angle(fu, fv):
+        wscale = taper_bottom + (1.0 - taper_bottom) * fv
+        return (fu - 0.5) * spread * wscale
+    strip(top, lambda fu, fv: (0.0, 1.0, 0.0))
+    strip(bottom, lambda fu, fv: (0.0, -1.0, 0.0))
+    strip(left, lambda fu, fv: (-np.cos(_edge_angle(fu, fv)), 0.0, np.sin(_edge_angle(fu, fv))))
+    strip(right, lambda fu, fv: (np.cos(_edge_angle(fu, fv)), 0.0, -np.sin(_edge_angle(fu, fv))))
+    return (
+        np.array(positions, dtype=np.float32),
+        np.array(normals, dtype=np.float32),
+        np.array(indices, dtype=np.int64),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Transforms (baked into vertex data; nodes carry translation only).
 # ---------------------------------------------------------------------------
@@ -350,35 +462,122 @@ def bone(name, geo_fn, separation=None):
     BONES.append((name, geo_fn, _norm(separation) if separation else None))
 
 # -- Skull -----------------------------------------------------------------
+# A proper cranial vault + facial skeleton: orbits with dark sockets and
+# rims, nasal aperture, zygomatic arches, maxilla with teeth, and a
+# U-shaped mandible (body + rami + chin) articulating at the TMJ — no more
+# floating face-box.
+def _teeth_row(y, z_front, z_back, half_spread, w, h, d, count=10):
+    geos = []
+    for k in range(count):
+        f = k / (count - 1) * 2 - 1  # -1..1 across the dental arcade
+        x = f * half_spread
+        z = z_front - abs(f) * (z_front - z_back)
+        geos.append(xform(make_box((w, h, d)), translate=(x, y, z)))
+    return merge_geos(geos)
+
+
 bone("Skull_Cranium",
-     lambda: xform(make_sphere(0.105), scale=(0.92, 1.08, 1.12), translate=(0, 1.685, -0.015)))
-bone("Skull_Face",
-     lambda: xform(make_box((0.115, 0.10, 0.095)), translate=(0, 1.600, 0.055)))
-bone("Mandible",
-     lambda: xform(make_box((0.100, 0.045, 0.075)), translate=(0, 1.545, 0.045)))
+     lambda: xform(make_sphere(0.105), scale=(0.94, 1.10, 1.02), translate=(0, 1.700, -0.020)),
+     separation=(0, 1, -0.15))
+for s, side in ((-1, "L"), (1, "R")):
+    bone(f"Skull_Mastoid_{side}",
+         lambda s=s: xform(make_sphere(0.015), translate=(s * 0.075, 1.620, -0.025)),
+         separation=(s * 0.4, 0, -0.6))
+    bone(f"Skull_OrbitSocket_{side}",  # dark inset: reads as the eye socket
+         lambda s=s: xform(make_sphere(0.027), scale=(1, 1.12, 0.55),
+                           translate=(s * 0.040, 1.648, 0.072)),
+         separation=(s * 0.3, 0.2, 0.9))
+    bone(f"Skull_OrbitRim_{side}",
+         lambda s=s: xform(make_torus(0.030, 0.007), translate=(s * 0.040, 1.648, 0.082)),
+         separation=(s * 0.3, 0.2, 0.9))
+    bone(f"Skull_NasalBone_{side}",
+         lambda s=s: xform(make_box((0.016, 0.036, 0.014)),
+                           rotate=(0.12, 0, -s * 0.06),
+                           translate=(s * 0.010, 1.630, 0.088)),
+         separation=(0, 0.2, 1))
+    bone(f"Skull_Zygomatic_{side}",  # cheekbone arch sweeping back to the ear
+         lambda s=s: make_tube([
+             (s * 0.058, 1.628, 0.062), (s * 0.078, 1.626, 0.034),
+             (s * 0.089, 1.634, 0.000), (s * 0.091, 1.643, -0.024),
+         ], 0.0085, samples_per_segment=8),
+         separation=(s * 0.8, 0, 0.3))
+    bone(f"Skull_Cheek_{side}",
+         lambda s=s: xform(make_box((0.026, 0.030, 0.024)),
+                           rotate=(0, s * 0.35, 0),
+                           translate=(s * 0.058, 1.624, 0.052)),
+         separation=(s * 0.6, -0.1, 0.7))
+bone("Skull_BrowRidge",
+     lambda: capsule_between((-0.055, 1.670, 0.082), (0.055, 1.670, 0.082), 0.0115),
+     separation=(0, 0.35, 0.9))
+bone("Skull_NasalCavity",  # dark inset: the nasal aperture
+     lambda: xform(make_box((0.026, 0.036, 0.014)), translate=(0, 1.602, 0.076)),
+     separation=(0, 0, 1))
+bone("Skull_Maxilla",
+     lambda: xform(make_box((0.076, 0.046, 0.062)), translate=(0, 1.594, 0.052)),
+     separation=(0, -0.25, 0.95))
+bone("Skull_UpperTeeth",
+     lambda: _teeth_row(1.568, 0.078, 0.056, 0.027, 0.0095, 0.014, 0.009),
+     separation=(0, -0.4, 0.9))
+
+# -- Mandible: U-shaped body, rami rising to the TMJ condyles, chin, teeth --
+# The body's back ends dive INTO the ramus plates so the jaw reads as one
+# fused bone instead of a floating strap.
+_mand_points = [(-0.068, 1.614, -0.004), (-0.068, 1.584, 0.018),
+                (-0.042, 1.560, 0.056), (0, 1.552, 0.070),
+                (0.042, 1.560, 0.056), (0.068, 1.584, 0.018),
+                (0.068, 1.614, -0.004)]
+bone("Mandible_Body",
+     lambda: make_tube(_mand_points, 0.015, samples_per_segment=10),
+     separation=(0, -1, 0.25))
+for s, side in ((-1, "L"), (1, "R")):
+    bone(f"Mandible_Ramus_{side}",
+         lambda s=s: merge_geos([
+             xform(make_box((0.022, 0.088, 0.020)),
+                   rotate=(0, s * 0.06, -s * 0.08),
+                   translate=(s * 0.068, 1.590, -0.004)),
+             xform(make_sphere(0.0115), translate=(s * 0.072, 1.630, -0.010)),
+         ]),
+         separation=(s * 0.5, -0.8, 0))
+bone("Mandible_Chin",
+     lambda: xform(make_box((0.042, 0.028, 0.026)), translate=(0, 1.550, 0.070)),
+     separation=(0, -0.7, 0.7))
+bone("Mandible_LowerTeeth",
+     lambda: _teeth_row(1.560, 0.066, 0.048, 0.024, 0.0085, 0.012, 0.008),
+     separation=(0, -0.9, 0.4))
 
 # -- Spine: 24 vertebrae + sacrum ------------------------------------------
-def vertebra(name, y, z, body, proc=None, pz=0.0):
+def vertebra(name, y, z, body, proc=None, pz=0.0, transverse=None):
     bone(name, lambda: xform(make_box(body), translate=(0, y, z)),
          separation=(0, 1 if y > 1.2 else -1, 0))
     if proc:
-        bone(name + "_Process",
-             lambda: xform(make_box(proc), translate=(0, y, z + pz)),
+        def _proc(body=body, proc=proc, y=y, z=z, pz=pz, transverse=transverse):
+            parts = [xform(make_box(proc), translate=(0, y, z + pz))]
+            if transverse:
+                tw, th, td = transverse
+                for s in (-1, 1):
+                    parts.append(xform(
+                        make_box((tw, th, td)),
+                        translate=(s * (body[0] / 2 + tw / 2 - 0.004), y, z - 0.005)))
+            return merge_geos(parts)
+        bone(name + "_Process", _proc,
              separation=(0, 1 if y > 1.2 else -1, -0.4))
 
 cerv_y = [1.505 - i * 0.0175 for i in range(7)]
 for i, y in enumerate(cerv_y):
-    vertebra(f"Vertebra_C{i + 1}", y, 0.006, (0.040, 0.016, 0.036))
+    vertebra(f"Vertebra_C{i + 1}", y, 0.006, (0.040, 0.016, 0.036),
+             transverse=(0.020, 0.010, 0.012))
 thor_y = [1.385 - i * 0.026 for i in range(12)]
 for i, y in enumerate(thor_y):
     vertebra(f"Vertebra_T{i + 1}", y, -0.012, (0.052, 0.022, 0.048),
-             proc=(0.014, 0.014, 0.045), pz=-0.042)
+             proc=(0.014, 0.014, 0.045), pz=-0.042,
+             transverse=(0.030, 0.012, 0.014))
 lumb_y = [1.075 - i * 0.036 for i in range(5)]
 for i, y in enumerate(lumb_y):
     vertebra(f"Vertebra_L{i + 1}", y, 0.008, (0.072, 0.030, 0.062),
-             proc=(0.018, 0.018, 0.055), pz=-0.052)
+             proc=(0.018, 0.018, 0.055), pz=-0.052,
+             transverse=(0.036, 0.014, 0.016))
 bone("Sacrum",
-     lambda: xform(make_box((0.095, 0.115, 0.050)), translate=(0, 0.875, -0.008)),
+     lambda: xform(make_box((0.080, 0.105, 0.045)), translate=(0, 0.878, -0.010)),
      separation=(0, -1, -0.2))
 
 # -- Rib cage: 12 swept rib pairs + sternum ---------------------------------
@@ -414,6 +613,22 @@ bone("Sternum",
 bone("Sternum_Manubrium",
      lambda: xform(make_box((0.062, 0.050, 0.020)), translate=(0, 1.425, 0.144)),
      separation=(0, 0.3, 1))
+bone("Sternum_Xiphoid",
+     lambda: xform(make_box((0.024, 0.038, 0.012)), translate=(0, 1.208, 0.145)),
+     separation=(0, -0.3, 1))
+# Costal cartilage bridging the true ribs (1-7) to the sternum.
+for i in range(7):
+    _cy = 1.425 - i * 0.0295
+    _cw = rib_widths[i]
+    _sy = min(max(_cy - 0.015, 1.240), 1.400)
+    for s, side in ((-1, "L"), (1, "R")):
+        bone(f"CostalCartilage_{i + 1:02d}_{side}",
+             lambda s=s, _cw=_cw, _cy=_cy, _sy=_sy: make_tube([
+                 (s * _cw * 0.52, _cy - 0.062, 0.125),
+                 (s * _cw * 0.34, _cy - 0.058, 0.140),
+                 (s * 0.022, _sy, 0.146),
+             ], 0.0062, samples_per_segment=8),
+             separation=(s * 0.5, 0, 0.8))
 
 # -- Shoulder girdle ---------------------------------------------------------
 for s, side in ((-1, "L"), (1, "R")):
@@ -431,6 +646,9 @@ for s, side in ((-1, "L"), (1, "R")):
 
 # -- Arms --------------------------------------------------------------------
 for s, side in ((-1, "L"), (1, "R")):
+    bone(f"Humerus_Head_{side}",
+         lambda s=s: xform(make_sphere(0.028), translate=(s * 0.212, 1.442, 0.002)),
+         separation=(s * 0.3, 1, 0))
     bone(f"Humerus_{side}",
          lambda s=s: capsule_between((s * 0.222, 1.425, 0), (s * 0.243, 1.135, 0), 0.026),
          separation=(s * 0.25, -1, 0))
@@ -472,21 +690,39 @@ for s, side in ((-1, "L"), (1, "R")):
          lambda s=s: capsule_between((s * 0.190, 0.772, 0.028), (s * 0.178, 0.738, 0.040), 0.0075),
          separation=(s * 0.35, -0.9, 0.2))
 
-# -- Pelvis ------------------------------------------------------------------
+# -- Pelvis: curved iliac blades, sacrum, ring-like ischium/pubis -----------
 for s, side in ((-1, "L"), (1, "R")):
     bone(f"Pelvis_Ilium_{side}",
-         lambda s=s: xform(make_box((0.125, 0.145, 0.028)),
-                            rotate=(0, -s * 0.45, s * 0.12),
-                            translate=(s * 0.112, 0.958, -0.012)))
+         # Yaw ~150°: the dished iliac fossa faces anteromedial (into the
+         # pelvic bowl, as in a real anterior view); the crest runs from
+         # ASIS (front) back-out to the posterior crest. Roll flares the
+         # crest outward. Tapered fan: wide crest narrowing to the hip joint.
+         lambda s=s: xform(make_curved_plate(0.110, 0.120, 0.020, 0.150, taper_bottom=0.55),
+                           rotate=(0.05, s * 2.61, -s * 0.18),
+                           translate=(s * 0.090, 0.930, -0.006)),
+         separation=(s * 0.8, 0.25, -0.2))
     bone(f"Pelvis_Ischium_{side}",
-         lambda s=s: xform(make_box((0.065, 0.085, 0.050)),
-                            translate=(s * 0.072, 0.868, -0.022)))
+         lambda s=s: make_tube([
+             (s * 0.078, 0.895, -0.018), (s * 0.066, 0.848, -0.002),
+             (s * 0.052, 0.822, 0.020), (s * 0.038, 0.818, 0.038),
+         ], 0.016, samples_per_segment=10),
+         separation=(s * 0.5, -0.8, 0.1))
     bone(f"Pelvis_Pubis_{side}",
-         lambda s=s: xform(make_box((0.055, 0.045, 0.040)),
-                            translate=(s * 0.048, 0.878, 0.058)))
+         lambda s=s: make_tube([
+             (s * 0.038, 0.818, 0.038), (s * 0.024, 0.824, 0.052),
+             (s * 0.010, 0.838, 0.058),
+         ], 0.013, samples_per_segment=8),
+         separation=(s * 0.4, -0.5, 0.6))
+bone("Pelvis_Symphysis",
+     lambda: xform(make_box((0.026, 0.038, 0.026)), translate=(0, 0.840, 0.058)))
 
 # -- Legs ----------------------------------------------------------------------
 for s, side in ((-1, "L"), (1, "R")):
+    bone(f"Hip_Femur_Trochanter_{side}",
+         lambda s=s: xform(make_box((0.028, 0.050, 0.030)),
+                           rotate=(0, 0, -s * 0.10),
+                           translate=(s * 0.120, 0.850, -0.002)),
+         separation=(s * 0.9, -0.2, 0))
     bone(f"Femoral_Head_{side}",
          lambda s=s: xform(make_sphere(0.042), translate=(s * 0.092, 0.888, 0.008)),
          separation=(s * 0.85, -0.35, 0))
@@ -572,11 +808,11 @@ def classify(name):
 
 EXPECTED_GROUP = {}
 for _name, _geo_fn, _sep in BONES:
-    if _name.startswith("Skull") or _name == "Mandible":
+    if _name.startswith("Skull") or _name.startswith("Mandible"):
         EXPECTED_GROUP[_name] = "skull"
     elif _name.startswith("Vertebra") or _name == "Sacrum":
         EXPECTED_GROUP[_name] = "spine"
-    elif _name.startswith("Rib") or _name.startswith("Sternum"):
+    elif _name.startswith("Rib") or _name.startswith("Sternum") or _name.startswith("Costal"):
         EXPECTED_GROUP[_name] = "ribCage"
     elif _name.startswith("Clavicle") or _name.startswith("Scapula"):
         EXPECTED_GROUP[_name] = "shoulder"

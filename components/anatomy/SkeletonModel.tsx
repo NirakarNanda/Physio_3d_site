@@ -16,19 +16,52 @@ if (process.env.NEXT_PUBLIC_USE_PLACEHOLDER_SKELETON !== "true") {
 }
 
 const IVORY = new THREE.Color("#EFE9DC");
+const SOCKET = new THREE.Color("#453D34");
+const CARTILAGE = new THREE.Color("#E9EDEA");
+const ENAMEL = new THREE.Color("#FBFAF6");
+
+// Shared materials — one instance per finish, created once per module load.
+// (Previously these were per-mesh; sharing cuts GPU program churn and the
+// unmount cleanup no longer disposes materials still in use by a remount.)
+const ivoryMaterial = new THREE.MeshStandardMaterial({
+  color: IVORY,
+  roughness: 0.52,
+  metalness: 0.02,
+  envMapIntensity: 0.55,
+});
+const socketMaterial = new THREE.MeshStandardMaterial({
+  color: SOCKET,
+  roughness: 0.95,
+  metalness: 0,
+  envMapIntensity: 0.25,
+});
+const cartilageMaterial = new THREE.MeshStandardMaterial({
+  color: CARTILAGE,
+  roughness: 0.35,
+  metalness: 0,
+  envMapIntensity: 0.7,
+});
+const enamelMaterial = new THREE.MeshStandardMaterial({
+  color: ENAMEL,
+  roughness: 0.28,
+  metalness: 0,
+  envMapIntensity: 0.8,
+});
 
 /**
  * Applies the "professional anatomical medical model" material treatment
- * (Section 9): warm ivory, soft roughness, no metalness, no vertex colors
- * fighting the palette. Runs once per mesh on load.
+ * (Section 9): warm ivory bone, dark recessed eye/nasal sockets, pale
+ * costal cartilage, bright enamel teeth. Runs once per mesh on load.
  */
 function applyMedicalMaterial(mesh: THREE.Mesh) {
-  const material = new THREE.MeshStandardMaterial({
-    color: IVORY,
-    roughness: 0.55,
-    metalness: 0.03,
-    envMapIntensity: 0.6,
-  });
+  const name = mesh.name;
+  const material = /socket|cavity/i.test(name)
+    ? socketMaterial
+    : /cartilage/i.test(name)
+      ? cartilageMaterial
+      : /teeth|tooth/i.test(name)
+        ? enamelMaterial
+        : ivoryMaterial;
   mesh.material = material;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -69,20 +102,10 @@ export function SkeletonModel({
 
     onReady(groups);
 
-    return () => {
-      // Dispose the per-mesh materials we created so repeated mounts
-      // (Fast Refresh, route changes) don't leak GPU programs.
-      cloned.traverse((node) => {
-        if (node instanceof THREE.Mesh) {
-          const material = node.material as THREE.Material | THREE.Material[];
-          if (Array.isArray(material)) {
-            material.forEach((m) => m.dispose());
-          } else {
-            material.dispose();
-          }
-        }
-      });
-    };
+    // No per-mesh disposal here: materials are shared module-level instances
+    // (see above) and geometries belong to the cached GLTF. Disposing them
+    // on unmount would break Fast Refresh remounts.
+    return () => {};
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloned]);
 

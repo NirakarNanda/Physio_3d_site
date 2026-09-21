@@ -44,6 +44,11 @@ export interface CameraKeyframe {
  * section's local progress, so the camera drifts continuously through the
  * entire timeline instead of stepping at section boundaries.
  *
+ * The zoom completes ~55% of the way through each section (rather than at
+ * its very end), so the zoomed-in state — with its key-structure labels —
+ * is what the reader actually spends time looking at, instead of a camera
+ * that only arrives as the section is already leaving.
+ *
  * `distanceScale` pushes the resolved position further from (>1) or closer
  * to (<1) its target along the same viewing axis, without touching the
  * authored keyframes in anatomyData.ts. This is what lets narrower/taller
@@ -58,10 +63,11 @@ export function getCameraKeyframe(
   const index = getActiveSectionIndex(progress, sections);
   const current = sections[index];
   const previous = sections[Math.max(0, index - 1)];
-  const local = smootherstep(getLocalProgress(progress, current));
+  const rawLocal = getLocalProgress(progress, current);
+  const zoomT = smootherstep(clamp01(rawLocal / 0.55));
 
-  const position = lerpVec3(previous.cameraPosition, current.cameraPosition, local);
-  const target = lerpVec3(previous.cameraTarget, current.cameraTarget, local);
+  const position = lerpVec3(previous.cameraPosition, current.cameraPosition, zoomT);
+  const target = lerpVec3(previous.cameraTarget, current.cameraTarget, zoomT);
 
   if (distanceScale === 1) return { position, target };
 
