@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { anatomyStore } from "@/lib/anatomyStore";
 import { anatomySections } from "./anatomyData";
 import { getActiveSectionIndex, getCameraKeyframe } from "./AnatomyTimeline";
+import { getSkullExplosionFactor, applySkullExplosion } from "./skullExplode";
 import type { AnatomyGroupKey, AnatomyGroups } from "./anatomyMapping";
 import { ANATOMY_GROUP_KEYS } from "./anatomyMapping";
 
@@ -26,6 +27,7 @@ export function AnatomyController({
   const { camera, size } = useThree();
   const lastSectionIndex = useRef(-1);
   const emphasisState = useRef<Map<THREE.Object3D, number>>(new Map());
+  const explodeFactor = useRef(0);
 
   useFrame((_, delta) => {
     const progress = anatomyStore.getProgress();
@@ -36,11 +38,26 @@ export function AnatomyController({
       anatomyStore.setSectionIndex(sectionIndex);
     }
 
+    // Skull exploded view: scroll-scrubbed factor, smoothed with the same
+    // damping as the camera so the parts and the dolly stay in sync.
+    const groups = groupsRef.current;
+    const damp = 1 - Math.pow(0.001, delta);
+    if (groups) {
+      const target = reducedMotion ? 0 : getSkullExplosionFactor(progress);
+      explodeFactor.current = reducedMotion
+        ? target
+        : THREE.MathUtils.lerp(explodeFactor.current, target, damp);
+    }
+    const explode = explodeFactor.current;
+
     // Narrower/taller viewports (tablet portrait, phone) need the camera
     // pulled back so the active region doesn't crop at the frame edges —
-    // desktop keyframes stay untouched (Section 17).
+    // desktop keyframes stay untouched (Section 17). The explosion gets an
+    // extra pull-back so the separated parts stay framed at full spread
+    // (verified headlessly: max |NDC| 0.93 at full explosion, 16:9).
     const aspect = size.width / size.height;
-    const distanceScale = aspect < 0.6 ? 1.55 : aspect < 0.85 ? 1.25 : 1;
+    const distanceScale =
+      (aspect < 0.6 ? 1.55 : aspect < 0.85 ? 1.25 : 1) * (1 + 0.32 * explode);
 
     const { position, target } = getCameraKeyframe(progress, anatomySections, distanceScale);
     tmpPos.set(...position);
@@ -54,7 +71,6 @@ export function AnatomyController({
     } else {
       // Critically-damped exponential smoothing — frame-rate independent,
       // and reads as a deliberate, controlled dolly rather than a snap.
-      const damp = 1 - Math.pow(0.001, delta);
       camera.position.lerp(tmpPos, damp);
 
       // Smoothly interpolate the look-at target too, otherwise the camera
@@ -65,8 +81,11 @@ export function AnatomyController({
       camera.lookAt(currentTarget);
     }
 
-    const groups = groupsRef.current;
     if (!groups) return;
+
+    // Explode the skull and publish the leader-line anchors before the
+    // emphasis pass (which never touches skull node positions).
+    applySkullExplosion(groups, explode, camera, size.width, size.height);
 
     const section = anatomySections[sectionIndex];
     const isFullBodyMoment = section.highlightGroups.length === 0;
