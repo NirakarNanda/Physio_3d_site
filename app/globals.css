@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: auto; /* Lenis (or native scroll under reduced-motion) owns smoothing */
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Visible keyboard focus everywhere (Section 20) */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid #a8b7a1;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile Safari (and some Android browsers) resize the viewport as browser
+   chrome shows/hides, so a plain `100vh` section can be taller than the
+   visible area — clipping the sticky anatomy canvas or its text overlay on
+   tablets especially. `dvh` tracks the actual visible viewport; browsers
+   that don't support it simply ignore the second declaration and keep the
+   100vh fallback above it (Section 17 / Section 29: no horizontal/vertical
+   overflow, usable on tablet). */
+.viewport-full {
+  height: 100vh;
+  height: 100dvh;
+}
