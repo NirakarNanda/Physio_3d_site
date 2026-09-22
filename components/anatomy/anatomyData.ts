@@ -72,7 +72,7 @@ export const anatomySections: AnatomySection[] = [
     cameraTarget: [0, 1.655, 0.01],
     separate: false,
     textSide: "left",
-    keyStructures: ["Cranium", "Facial bones", "Mandible"],
+    keyStructures: ["Cranium", "Mandible", "Hyoid bone"],
   },
   {
     id: "spine",
@@ -102,7 +102,7 @@ export const anatomySections: AnatomySection[] = [
     cameraTarget: [0, 1.28, 0],
     separate: true,
     textSide: "left",
-    keyStructures: ["12 rib pairs", "Sternum", "Costal cartilage"],
+    keyStructures: ["12 rib pairs", "Sternum", "Xiphoid process"],
   },
   {
     id: "shoulder",
@@ -162,7 +162,7 @@ export const anatomySections: AnatomySection[] = [
     cameraTarget: [0, 0.9, 0],
     separate: false,
     textSide: "left",
-    keyStructures: ["Ilium", "Ischium", "Pubis"],
+    keyStructures: ["Hip bones", "Sacrum"],
   },
   {
     id: "hip",
@@ -177,7 +177,7 @@ export const anatomySections: AnatomySection[] = [
     cameraTarget: [0.16, 0.86, 0],
     separate: true,
     textSide: "right",
-    keyStructures: ["Femoral head", "Acetabulum", "Femur"],
+    keyStructures: ["Femur", "Hip joint"],
   },
   {
     id: "knee",
@@ -191,7 +191,7 @@ export const anatomySections: AnatomySection[] = [
     cameraTarget: [0.13, 0.46, 0],
     separate: true,
     textSide: "left",
-    keyStructures: ["Patella", "Femur", "Tibia", "Fibula"],
+    keyStructures: ["Patella", "Tibia", "Fibula"],
   },
   {
     id: "ankle",
@@ -206,7 +206,7 @@ export const anatomySections: AnatomySection[] = [
     cameraTarget: [0.11, 0.12, 0],
     separate: false,
     textSide: "right",
-    keyStructures: ["Talus", "Tibia", "Fibula"],
+    keyStructures: ["Talus", "Ankle joint"],
   },
   {
     id: "foot",

@@ -54,6 +54,21 @@ export function AnatomyExperience() {
         <AnatomyLabels />
         <ExplodedLabels />
 
+        {/* CC-BY attribution for the 3D skeleton model (required by the
+            license). Kept subtle in the corner of the experience. */}
+        <p className="pointer-events-none absolute bottom-3 left-4 z-10 max-w-[240px] font-body text-[10px] leading-snug text-ink-muted/70">
+          3D skeleton: &ldquo;CT Derived Human Skeleton&rdquo; by Terrie
+          Simmons-Ehrhardt,{" "}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
+            rel="noreferrer"
+            className="pointer-events-auto underline decoration-ink-muted/40 underline-offset-2 hover:text-ink"
+          >
+            CC-BY 4.0
+          </a>
+        </p>
+
         {/* Content required for screen readers / no-motion users lives here
             too, so no information exists only inside the 3D animation
             (Section 20). Visually hidden but present in the DOM. */}

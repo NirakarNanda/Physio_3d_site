@@ -2,17 +2,39 @@
 
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { useGLTF } from "@react-three/drei";
-import { buildAnatomyGroups, flattenGroups, type AnatomyGroups } from "./anatomyMapping";
+import { useLoader } from "@react-three/fiber";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+import { buildAnatomyGroups, flattenGroups, type AnatomyGroupKey, type AnatomyGroups } from "./anatomyMapping";
 
 const MODEL_PATH = "/models/skeleton.glb";
+
+/**
+ * Exact-name overrides applied before keyword matching. The CT export
+ * names its two plantar sesamoids (under the big toe) generically, so
+ * keyword matching would file them under the hand group — they belong
+ * to the foot. Callers can extend via the `overrides` prop.
+ */
+const MODEL_OVERRIDES: Record<string, AnatomyGroupKey> = {
+  sesamoids: "foot",
+  sesamoids_001: "foot",
+};
+
+// The CT skeleton GLB is Draco-compressed. The decoder WASM/JS is served
+// from /public/draco (copied from three's examples/jsm/libs/draco).
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath("/draco/");
+
+function withDraco(loader: GLTFLoader) {
+  loader.setDRACOLoader(dracoLoader);
+}
 
 // Preload the GLB as soon as this module is imported — but only when the
 // real model path is active. In placeholder mode the canvas renders the
 // procedural PlaceholderSkeleton instead, so preloading would fetch a
 // megabyte we never display.
 if (process.env.NEXT_PUBLIC_USE_PLACEHOLDER_SKELETON !== "true") {
-  useGLTF.preload(MODEL_PATH);
+  useLoader.preload(GLTFLoader, MODEL_PATH, withDraco);
 }
 
 const IVORY = new THREE.Color("#EFE9DC");
@@ -74,7 +96,7 @@ export function SkeletonModel({
   onReady: (groups: AnatomyGroups) => void;
   overrides?: Parameters<typeof buildAnatomyGroups>[1];
 }) {
-  const { scene } = useGLTF(MODEL_PATH);
+  const { scene } = useLoader(GLTFLoader, MODEL_PATH, withDraco);
 
   // Clone so hot-reloads / repeated mounts don't mutate the cached GLTF.
   const cloned = useMemo(() => scene.clone(true), [scene]);
@@ -84,7 +106,10 @@ export function SkeletonModel({
       if (node instanceof THREE.Mesh) applyMedicalMaterial(node);
     });
 
-    const { groups, unassigned } = buildAnatomyGroups(cloned, overrides);
+    const { groups, unassigned } = buildAnatomyGroups(cloned, {
+      ...MODEL_OVERRIDES,
+      ...overrides,
+    });
 
     if (process.env.NODE_ENV === "development" && unassigned.length > 0) {
       // eslint-disable-next-line no-console
