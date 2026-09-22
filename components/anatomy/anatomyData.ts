@@ -54,9 +54,12 @@ export const anatomySections: AnatomySection[] = [
     end: 0.08,
     highlightGroups: [],
     cameraPosition: [0, 1.05, 4.4],
-    cameraTarget: [0, 0.95, 0],
+    // Look-target shifted left so the full-body skeleton sits in the right
+    // of frame — the bookend text panel lives on the left and must never
+    // cover the bones (Section: intro/outro overlap fix).
+    cameraTarget: [-0.5, 0.95, 0],
     separate: false,
-    textSide: "center",
+    textSide: "left",
     keyStructures: [],
   },
   {
@@ -232,9 +235,11 @@ export const anatomySections: AnatomySection[] = [
     end: 1.001,
     highlightGroups: [],
     cameraPosition: [0, 1.05, 4.4],
-    cameraTarget: [0, 0.95, 0],
+    // Same right-of-frame offset as the intro: the closing statement sits
+    // in the clear left margin, never on top of the skeleton.
+    cameraTarget: [-0.5, 0.95, 0],
     separate: false,
-    textSide: "center",
+    textSide: "left",
     keyStructures: [],
   },
 ];

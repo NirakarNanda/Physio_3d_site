@@ -1,3 +1,5 @@
+import { Reveal, ParallaxImage } from "./Reveal";
+
 const PRINCIPLES = [
   {
     number: "01",
@@ -23,21 +25,54 @@ const PRINCIPLES = [
 
 export function ApproachSection() {
   return (
-    <section id="approach" className="scroll-mt-16 bg-bg-secondary px-6 py-32 md:px-16 md:py-40">
-      <div className="mx-auto max-w-content">
-        <span className="block text-[11px] font-body uppercase tracking-label text-ink-muted">
-          Our Approach
-        </span>
-        <div className="mt-16 grid grid-cols-1 gap-x-10 gap-y-16 md:grid-cols-4">
-          {PRINCIPLES.map((p) => (
-            <div key={p.number}>
-              <span className="font-display text-sm text-accent">{p.number}</span>
-              <h3 className="mt-3 font-display text-2xl text-ink">{p.title}</h3>
-              <p className="mt-3 font-body text-sm leading-relaxed text-ink-muted">
-                {p.copy}
-              </p>
-            </div>
-          ))}
+    <section
+      id="approach"
+      className="scroll-mt-16 bg-bg-secondary px-6 py-28 md:px-16 md:py-40"
+    >
+      <div className="mx-auto grid max-w-content grid-cols-1 gap-14 md:grid-cols-12 md:gap-10">
+        <div className="md:col-span-5">
+          <div className="md:sticky md:top-28">
+            <Reveal y={36}>
+              <ParallaxImage
+                src="/images/spine-illustration.jpg"
+                alt="Ink illustration of the human spine in profile"
+                ratio="aspect-[3/4]"
+                sizes="(max-width: 768px) 100vw, 40vw"
+                caption="The vertebral column — thirty-three vertebrae, one kinetic chain."
+              />
+            </Reveal>
+          </div>
+        </div>
+
+        <div className="md:col-span-7">
+          <Reveal>
+            <span className="block text-[11px] font-body uppercase tracking-label text-ink-muted">
+              Our Approach
+            </span>
+            <h2 className="mt-6 max-w-md font-display text-3xl leading-[1.12] text-ink md:text-4xl">
+              Four steps. One goal: movement you can trust.
+            </h2>
+          </Reveal>
+
+          <ol className="mt-12">
+            {PRINCIPLES.map((p, i) => (
+              <Reveal key={p.number} delay={Math.min(i * 0.08, 0.24)} y={24}>
+                <li className="group flex gap-6 border-t border-ink/10 py-8 transition-transform duration-500 ease-editorial last:border-b hover:-translate-y-0.5 md:gap-10">
+                  <span className="font-editorial text-lg text-accent transition-colors group-hover:text-ink">
+                    {p.number}
+                  </span>
+                  <div>
+                    <h3 className="font-display text-2xl text-ink md:text-[1.7rem]">
+                      {p.title}
+                    </h3>
+                    <p className="mt-2 max-w-md font-body text-[15px] leading-relaxed text-ink-muted">
+                      {p.copy}
+                    </p>
+                  </div>
+                </li>
+              </Reveal>
+            ))}
+          </ol>
         </div>
       </div>
     </section>

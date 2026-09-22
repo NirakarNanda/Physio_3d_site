@@ -1,4 +1,5 @@
 import { Hero } from "@/components/sections/Hero";
+import { LightToDarkTransition, DarkToLightTransition } from "@/components/sections/ChapterTransition";
 import { AnatomyExperience } from "@/components/sections/AnatomyExperience";
 import { MovementSection } from "@/components/sections/MovementSection";
 import { ApproachSection } from "@/components/sections/ApproachSection";
@@ -10,7 +11,9 @@ export default function Home() {
   return (
     <main>
       <Hero />
+      <LightToDarkTransition />
       <AnatomyExperience />
+      <DarkToLightTransition />
       <MovementSection />
       <ApproachSection />
       <AreasSection />
