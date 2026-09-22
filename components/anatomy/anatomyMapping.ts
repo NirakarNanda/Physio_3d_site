@@ -123,7 +123,11 @@ export function buildAnatomyGroups(
   const overrideLookup = new Map<string, AnatomyGroupKey>();
   if (overrides) {
     (Object.keys(overrides) as AnatomyGroupKey[]).forEach((key) => {
-      overrides[key]?.forEach((name) => overrideLookup.set(name.toLowerCase(), key));
+      const names = overrides[key];
+      // Tolerate a lone string (a common caller slip) instead of crashing.
+      (Array.isArray(names) ? names : names ? [names] : []).forEach((name) =>
+        overrideLookup.set(name.toLowerCase(), key)
+      );
     });
   }
 

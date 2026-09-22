@@ -15,9 +15,8 @@ const MODEL_PATH = "/models/skeleton.glb";
  * keyword matching would file them under the hand group — they belong
  * to the foot. Callers can extend via the `overrides` prop.
  */
-const MODEL_OVERRIDES: Record<string, AnatomyGroupKey> = {
-  sesamoids: "foot",
-  sesamoids_001: "foot",
+const MODEL_OVERRIDES: Partial<Record<AnatomyGroupKey, string[]>> = {
+  foot: ["sesamoids", "sesamoids_001"],
 };
 
 // The CT skeleton GLB is Draco-compressed. The decoder WASM/JS is served
