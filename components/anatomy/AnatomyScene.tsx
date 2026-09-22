@@ -47,12 +47,12 @@ export function AnatomyScene() {
 
   if (webglOk === false) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-bg">
+      <div className="flex h-full w-full items-center justify-center bg-[#0A0B0D]">
         <div className="w-[260px] text-center font-body">
-          <p className="text-[11px] uppercase tracking-label text-ink-muted">
+          <p className="text-[11px] uppercase tracking-label text-[#B4B0A6]">
             3D anatomy model unavailable
           </p>
-          <p className="mt-2 text-xs text-ink-muted/80">
+          <p className="mt-2 text-xs text-[#8E8B83]">
             This device or browser doesn&apos;t support WebGL, which the
             interactive skeleton needs. Try an up-to-date browser such as
             Chrome or Safari.
@@ -78,21 +78,21 @@ export function AnatomyScene() {
         // sheen; kept subtle so the key light still models the forms.
         const pmrem = new THREE.PMREMGenerator(gl);
         scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-        scene.environmentIntensity = 0.5;
+        scene.environmentIntensity = 0.6;
         pmrem.dispose();
       }}
     >
-      <color attach="background" args={["#F7F5F0"]} />
-      <hemisphereLight args={["#FFFDF8", "#D9D2C4", 0.35]} />
+      <color attach="background" args={["#0A0B0D"]} />
+      <hemisphereLight args={["#FFFDF8", "#2A2C31", 0.4]} />
       <directionalLight
         position={[2.2, 3.2, 2.4]}
-        intensity={1.35}
+        intensity={1.5}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0005}
       />
-      <directionalLight position={[-2.2, 2.0, -2.2]} intensity={0.55} color="#E2E8F2" />
-      <directionalLight position={[0, 0.6, 2.5]} intensity={0.22} color="#FFF6E8" />
+      <directionalLight position={[-2.2, 2.0, -2.2]} intensity={0.7} color="#B9C4D6" />
+      <directionalLight position={[0, 0.6, 2.5]} intensity={0.3} color="#FFF6E8" />
 
       <Suspense fallback={<AnatomyLoader />}>
         <group scale={MODEL_SCALE} position={[0, MODEL_Y_OFFSET, 0]}>

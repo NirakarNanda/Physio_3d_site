@@ -40,10 +40,10 @@ export function AnatomyUnavailableMessage() {
   return (
     <Html center>
       <div className="w-[260px] text-center font-body">
-        <p className="text-[11px] uppercase tracking-label text-ink-muted">
+        <p className="text-[11px] uppercase tracking-label text-[#B4B0A6]">
           3D anatomy model unavailable
         </p>
-        <p className="mt-2 text-xs text-ink-muted/80">
+        <p className="mt-2 text-xs text-[#8E8B83]">
           Place a model at /public/models/skeleton.glb to activate the full experience.
         </p>
       </div>

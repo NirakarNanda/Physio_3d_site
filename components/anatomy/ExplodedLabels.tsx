@@ -9,21 +9,22 @@ import { useReducedMotion } from "./useReducedMotion";
 
 /**
  * Vertical slot for a label, as a fraction of viewport height. Labels are
- * spread evenly across the rail; every section's label defs are ordered
- * top → bottom to match their exploded positions so leader lines never
- * cross.
+ * spread across the middle band of the rail with generous spacing; every
+ * section's label defs are ordered top → bottom to match their exploded
+ * positions so leader lines never cross.
  */
 function slotY(i: number, n: number): number {
-  return n === 1 ? 0.5 : 0.3 + (0.45 * i) / (n - 1);
+  return n === 1 ? 0.5 : 0.18 + (0.64 * i) / (n - 1);
 }
 
 /**
- * Neoconda-style exploded-view callouts: thin leader lines with a dot at
- * each part, running to numbered labels on a side rail. One instance serves
- * every anatomy section — the active section's config picks the group, the
- * labels, and which screen edge the rail sits on (always opposite the text
- * panel). Positions are updated imperatively in a rAF loop from the shared
- * per-frame explosion state — no React re-renders at scroll speed.
+ * Exploded-view callouts in the Aceternity spirit: hairline leader lines
+ * with a soft halo dot at each part, running to small editorial labels on
+ * a side rail — always on the opposite side from the text panel, so labels
+ * and panel copy can never collide. One instance serves every anatomy
+ * section; the active section's config picks the group, the labels, and
+ * the rail side. Positions update imperatively in a rAF loop from the
+ * shared per-frame explosion state — no React re-renders at scroll speed.
  *
  * Decorative for assistive tech: the same structures are already named in
  * the key-structure chips and the sr-only summary, so this is aria-hidden.
@@ -59,6 +60,9 @@ export function ExplodedLabels() {
     const dotEls = Array.from(
       svg.querySelectorAll<SVGCircleElement>("[data-explode-dot]")
     );
+    const haloEls = Array.from(
+      svg.querySelectorAll<SVGCircleElement>("[data-explode-halo]")
+    );
 
     let raf = 0;
     const tick = () => {
@@ -72,27 +76,34 @@ export function ExplodedLabels() {
       const H = st.height;
       if (W === 0 || H === 0) return;
 
-      root.style.opacity = f < 0.02 ? "0" : String(Math.min(1, f * 1.5));
-      root.style.visibility = f < 0.02 ? "hidden" : "visible";
+      const shown = f >= 0.02;
+      root.style.opacity = shown ? String(Math.min(1, f * 1.6)) : "0";
+      root.style.visibility = shown ? "visible" : "hidden";
+      if (!shown) return;
 
-      const railX = W * (leftRail ? 0.2 : 0.8);
+      // Labels drift in from the rail as the explosion ramps — a small
+      // choreographed entrance tied to the same scroll driver as the 3D.
+      const slide = (1 - Math.min(1, f * 2.2)) * 18 * (leftRail ? -1 : 1);
+      const railX = W * (leftRail ? 0.14 : 0.86);
       for (let i = 0; i < n; i++) {
         const anchor = st.anchors[i];
         const label = labelEls[i];
         const line = lineEls[i];
         const dot = dotEls[i];
+        const halo = haloEls[i];
         if (!anchor || !label || !line || !dot) continue;
 
         const sy = H * slotY(i, n);
         // Right rail: labels start just right of the rail, left-aligned.
         // Left rail: labels end just left of the rail, right-aligned.
         label.style.transform = leftRail
-          ? `translate(${railX - 14}px, ${sy}px) translate(-100%, -50%)`
-          : `translate(${railX + 14}px, ${sy}px) translateY(-50%)`;
+          ? `translate(${railX - 14 + slide}px, ${sy}px) translate(-100%, -50%)`
+          : `translate(${railX + 14 + slide}px, ${sy}px) translateY(-50%)`;
 
         if (!anchor.visible) {
           line.setAttribute("points", "");
           dot.setAttribute("r", "0");
+          halo?.setAttribute("r", "0");
           continue;
         }
         const ax = anchor.x;
@@ -106,7 +117,10 @@ export function ExplodedLabels() {
         line.setAttribute("points", points);
         dot.setAttribute("cx", String(ax));
         dot.setAttribute("cy", String(ay));
-        dot.setAttribute("r", "2.5");
+        dot.setAttribute("r", "2");
+        halo?.setAttribute("cx", String(ax));
+        halo?.setAttribute("cy", String(ay));
+        halo?.setAttribute("r", "6");
       }
     };
     raf = requestAnimationFrame(tick);
@@ -127,15 +141,22 @@ export function ExplodedLabels() {
             <polyline
               data-explode-line
               fill="none"
-              stroke="currentColor"
+              stroke="#EDE9DF"
+              strokeOpacity={0.28}
               strokeWidth={1}
-              className="text-ink/40"
               points=""
             />
             <circle
+              data-explode-halo
+              fill="#A8B7A1"
+              fillOpacity={0.18}
+              r={0}
+              cx={0}
+              cy={0}
+            />
+            <circle
               data-explode-dot
-              fill="currentColor"
-              className="text-ink/60"
+              fill="#A8B7A1"
               r={0}
               cx={0}
               cy={0}
@@ -150,12 +171,18 @@ export function ExplodedLabels() {
           className="absolute left-0 top-0 will-change-transform"
         >
           <span
-            className={`whitespace-nowrap font-body text-[10px] uppercase tracking-label text-ink ${
-              cfg.railSide === "left" ? "text-right" : ""
+            className={`flex items-center gap-2 whitespace-nowrap ${
+              cfg.railSide === "left" ? "flex-row-reverse" : ""
             }`}
+            style={{ textShadow: "0 1px 10px rgba(0,0,0,0.85)" }}
           >
-            <span className="mr-2 text-accent">{def.index}</span>
-            {def.title}
+            <span className="font-body text-[10px] tabular-nums text-accent">
+              {def.index}
+            </span>
+            <span className="h-px w-4 bg-white/25" />
+            <span className="font-body text-[11px] uppercase tracking-[0.18em] text-[#EDE9DF]">
+              {def.title}
+            </span>
           </span>
         </div>
       ))}

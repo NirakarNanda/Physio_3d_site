@@ -24,6 +24,7 @@ const config: Config = {
       fontFamily: {
         display: ["var(--font-display)", "sans-serif"],
         body: ["var(--font-body)", "sans-serif"],
+        editorial: ["var(--font-editorial)", "Georgia", "serif"],
       },
       letterSpacing: {
         label: "0.18em",

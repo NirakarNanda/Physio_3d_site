@@ -241,3 +241,11 @@ export const anatomySections: AnatomySection[] = [
 
 /** Total vertical scroll length of the pinned anatomy track, in viewport heights. */
 export const ANATOMY_TRACK_VH = 850;
+
+/**
+ * Body-region number (1–11) for the progress readout. The intro shows 01
+ * and the outro holds at 11 — only the eleven anatomy sections count.
+ */
+export function getAnatomySectionNumber(sectionIndex: number): number {
+  return Math.min(11, Math.max(1, sectionIndex));
+}

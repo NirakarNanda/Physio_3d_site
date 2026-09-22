@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Inter } from "next/font/google";
+import { Manrope, Inter, Fraunces } from "next/font/google";
 import { Navbar } from "@/components/navigation/Navbar";
 import "./globals.css";
 
@@ -17,6 +17,17 @@ const body = Inter({
   display: "swap",
 });
 
+// Editorial serif reserved for the anatomy chapter's display type —
+// medical-editorial voice (titles, numerals) without touching the
+// site-wide Manrope/Inter pairing.
+const editorial = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-editorial",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Meridian PT — The Science of Movement",
   description:
@@ -25,7 +36,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable} ${editorial.variable}`}>
       <body id="top" className="bg-bg font-body text-ink antialiased">
         <Navbar />
         {children}

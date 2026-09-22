@@ -8,6 +8,13 @@ export interface ExplodeLabelDef {
   id: string;
   /** Exact mesh name the leader line anchors to. */
   mesh: string;
+  /**
+   * Optional model-space offset (meters) from the mesh's geometric center.
+   * Lets one fused mesh carry several regional labels — e.g. the CT
+   * cranium is a single mesh, so "Frontal bone" / "Zygomatic arch" anchor
+   * to measured points on it rather than its center.
+   */
+  anchor?: [number, number, number];
   index: string;
   title: string;
 }
@@ -51,14 +58,16 @@ export interface ExplodeSectionConfig {
 
 /**
  * Exploded-view offsets per skull mesh, in meters. The CT skull (cranium
- * + mandible + hyoid) is ~0.22 m tall; these spread it to ~0.55 m at full
- * explosion — cranium up and slightly back, mandible down and forward,
- * hyoid drifting forward between them.
+ * + mandible + hyoid) is ~0.22 m tall; these spread it to ~0.38 m at full
+ * explosion — cranium lifting gently, the mandible dropping and tipping
+ * forward as if the jaw is opening, hyoid drifting between them. Kept
+ * deliberately modest so the skull reads as articulating, not flying
+ * apart (user feedback, 2026-09-22).
  */
 const SKULL_OFFSETS: Record<string, [number, number, number]> = {
-  Cranium: [0, 0.16, -0.03],
-  hyoid: [0, -0.05, 0.1],
-  Mandible: [0, -0.13, 0.06],
+  Cranium: [0, 0.1, -0.02],
+  hyoid: [0, -0.028, 0.055],
+  Mandible: [0, -0.06, 0.045],
 };
 
 /**
@@ -77,12 +86,15 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     offsets: SKULL_OFFSETS,
     magnitude: 0,
     centroid: [0.005, 1.56, 0.059],
-    pullback: 0.4,
-    railSide: "left",
+    pullback: 0.26,
+    railSide: "right",
     labels: [
-      { id: "skull-cranium", mesh: "Cranium", index: "01", title: "Cranium" },
-      { id: "skull-hyoid", mesh: "hyoid", index: "02", title: "Hyoid bone" },
-      { id: "skull-mandible", mesh: "Mandible", index: "03", title: "Mandible" },
+      { id: "skull-parietal", mesh: "Cranium", anchor: [0, 0.09, -0.01], index: "01", title: "Parietal bone" },
+      { id: "skull-frontal", mesh: "Cranium", anchor: [0, 0.058, 0.058], index: "02", title: "Frontal bone" },
+      { id: "skull-zygomatic", mesh: "Cranium", anchor: [0.058, -0.028, 0.028], index: "03", title: "Zygomatic arch" },
+      { id: "skull-maxilla", mesh: "Cranium", anchor: [0, -0.072, 0.058], index: "04", title: "Maxilla" },
+      { id: "skull-mandible", mesh: "Mandible", index: "05", title: "Mandible" },
+      { id: "skull-hyoid", mesh: "hyoid", index: "06", title: "Hyoid bone" },
     ],
   },
   {
@@ -92,12 +104,17 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.1,
     centroid: [-0.002, 1.316, -0.042],
     pullback: 0.25,
-    railSide: "right",
+    railSide: "left",
     labels: [
-      { id: "spine-cervical", mesh: "c4", index: "01", title: "Cervical vertebrae" },
-      { id: "spine-thoracic", mesh: "t6", index: "02", title: "Thoracic vertebrae" },
-      { id: "spine-lumbar", mesh: "l3", index: "03", title: "Lumbar vertebrae" },
-      { id: "spine-sacrum", mesh: "Sacrum", index: "04", title: "Sacrum" },
+      { id: "spine-c1", mesh: "c1", index: "01", title: "Atlas (C1)" },
+      { id: "spine-c2", mesh: "c2", index: "02", title: "Axis (C2)" },
+      { id: "spine-c7", mesh: "c7", index: "03", title: "C7 vertebra" },
+      { id: "spine-t1", mesh: "t1", index: "04", title: "T1 vertebra" },
+      { id: "spine-t6", mesh: "t6", index: "05", title: "T6 vertebra" },
+      { id: "spine-t12", mesh: "t12", index: "06", title: "T12 vertebra" },
+      { id: "spine-l3", mesh: "l3", index: "07", title: "L3 vertebra" },
+      { id: "spine-sacrum", mesh: "Sacrum", index: "08", title: "Sacrum" },
+      { id: "spine-coccyx", mesh: "Coccyx", index: "09", title: "Coccyx" },
     ],
   },
   {
@@ -107,11 +124,14 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.17,
     centroid: [-0.001, 1.302, -0.01],
     pullback: 0.02,
-    railSide: "left",
+    railSide: "right",
     labels: [
-      { id: "rib-sternum", mesh: "Sternum", index: "01", title: "Sternum" },
-      { id: "rib-xiphoid", mesh: "Xiphoid_process", index: "02", title: "Xiphoid process" },
-      { id: "rib-ribs", mesh: "l_rib6", index: "03", title: "Ribs" },
+      { id: "rib-rib2", mesh: "l_rib2", index: "01", title: "2nd rib" },
+      { id: "rib-sternum", mesh: "Sternum", index: "02", title: "Sternum" },
+      { id: "rib-rib6", mesh: "l_rib6", index: "03", title: "6th rib" },
+      { id: "rib-xiphoid", mesh: "Xiphoid_process", index: "04", title: "Xiphoid process" },
+      { id: "rib-rib10", mesh: "l_rib10", index: "05", title: "10th rib" },
+      { id: "rib-rib12", mesh: "l_rib12", index: "06", title: "12th rib (floating)" },
     ],
   },
   {
@@ -121,7 +141,7 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.13,
     centroid: [-0.002, 1.434, -0.016],
     pullback: 0.02,
-    railSide: "right",
+    railSide: "left",
     labels: [
       { id: "shoulder-clavicle", mesh: "l_clavicle", index: "01", title: "Clavicle" },
       { id: "shoulder-scapula", mesh: "l_scapula", index: "02", title: "Scapula" },
@@ -134,11 +154,12 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.1,
     centroid: [-0.005, 1.134, -0.02],
     pullback: 0.68,
-    railSide: "left",
+    railSide: "right",
     labels: [
-      { id: "arm-humerus", mesh: "l_humerus", index: "01", title: "Humerus" },
-      { id: "arm-radius", mesh: "l_radius", index: "02", title: "Radius" },
+      { id: "arm-humeral-head", mesh: "l_humerus", anchor: [0, 0.14, 0], index: "01", title: "Humeral head" },
+      { id: "arm-humerus", mesh: "l_humerus", index: "02", title: "Humerus" },
       { id: "arm-ulna", mesh: "l_ulna", index: "03", title: "Ulna" },
+      { id: "arm-radius", mesh: "l_radius", index: "04", title: "Radius" },
     ],
   },
   {
@@ -148,11 +169,16 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.06,
     centroid: [-0.008, 0.84, 0.016],
     pullback: 0.5,
-    railSide: "right",
+    railSide: "left",
     labels: [
-      { id: "hand-carpals", mesh: "l_lunate", index: "01", title: "Carpals" },
-      { id: "hand-metacarpals", mesh: "l_metacarpal3", index: "02", title: "Metacarpals" },
-      { id: "hand-phalanges", mesh: "l_proximal_phalange3", index: "03", title: "Phalanges" },
+      { id: "hand-lunate", mesh: "l_lunate", index: "01", title: "Lunate" },
+      { id: "hand-scaphoid", mesh: "l_scaphoid", index: "02", title: "Scaphoid" },
+      { id: "hand-capitate", mesh: "l_capitate", index: "03", title: "Capitate" },
+      { id: "hand-hamate", mesh: "l_hamate", index: "04", title: "Hamate" },
+      { id: "hand-metacarpal3", mesh: "l_metacarpal3", index: "05", title: "3rd metacarpal" },
+      { id: "hand-proximal", mesh: "l_proximal_phalange3", index: "06", title: "Proximal phalanx" },
+      { id: "hand-middle", mesh: "l_intermediate_phalange3", index: "07", title: "Middle phalanx" },
+      { id: "hand-distal", mesh: "l_distal_phalange3", index: "08", title: "Distal phalanx" },
     ],
   },
   {
@@ -162,10 +188,11 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.15,
     centroid: [-0.002, 0.968, -0.034],
     pullback: 0.02,
-    railSide: "left",
+    railSide: "right",
     labels: [
-      { id: "pelvis-left", mesh: "l_oscoxa", index: "01", title: "Hip bone (left)" },
-      { id: "pelvis-right", mesh: "r_oscoxa", index: "02", title: "Hip bone (right)" },
+      { id: "pelvis-sacrum", mesh: "Sacrum", index: "01", title: "Sacrum" },
+      { id: "pelvis-right", mesh: "r_oscoxa", index: "02", title: "Hip bone · right" },
+      { id: "pelvis-left", mesh: "l_oscoxa", index: "03", title: "Hip bone · left" },
     ],
   },
   {
@@ -175,10 +202,11 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.07,
     centroid: [-0.006, 0.722, -0.051],
     pullback: 0.43,
-    railSide: "right",
+    railSide: "left",
     labels: [
-      { id: "hip-left", mesh: "l_femur", index: "01", title: "Femur (left)" },
-      { id: "hip-right", mesh: "r_femur", index: "02", title: "Femur (right)" },
+      { id: "hip-femoral-head", mesh: "l_femur", anchor: [0, 0.2, 0], index: "01", title: "Femoral head" },
+      { id: "hip-femur", mesh: "l_femur", index: "02", title: "Femur" },
+      { id: "hip-femur-r", mesh: "r_femur", index: "03", title: "Femur · right" },
     ],
   },
   {
@@ -188,7 +216,7 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.08,
     centroid: [-0.006, 0.372, -0.037],
     pullback: 0.71,
-    railSide: "left",
+    railSide: "right",
     labels: [
       { id: "knee-patella", mesh: "l_patella", index: "01", title: "Patella" },
       { id: "knee-tibia", mesh: "l_tibia", index: "02", title: "Tibia" },
@@ -202,10 +230,10 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.07,
     centroid: [-0.006, 0.1, -0.03],
     pullback: 0.02,
-    railSide: "right",
+    railSide: "left",
     labels: [
-      { id: "ankle-left", mesh: "l_talus", index: "01", title: "Talus (left)" },
-      { id: "ankle-right", mesh: "r_talus", index: "02", title: "Talus (right)" },
+      { id: "ankle-talus", mesh: "l_talus", index: "01", title: "Talus" },
+      { id: "ankle-talus-r", mesh: "r_talus", index: "02", title: "Talus · right" },
     ],
   },
   {
@@ -215,12 +243,16 @@ const EXPLODE_CONFIGS: ExplodeSectionConfig[] = [
     magnitude: 0.06,
     centroid: [-0.006, 0.029, 0.058],
     pullback: 0.18,
-    railSide: "left",
+    railSide: "right",
     labels: [
-      { id: "foot-calcaneus", mesh: "l_calcaneus", index: "01", title: "Calcaneus" },
-      { id: "foot-tarsals", mesh: "l_navicular", index: "02", title: "Tarsals" },
-      { id: "foot-metatarsals", mesh: "l_metatarsal_3", index: "03", title: "Metatarsals" },
-      { id: "foot-phalanges", mesh: "l_distal_phalange_3", index: "04", title: "Phalanges" },
+      { id: "foot-talus", mesh: "l_talus", index: "01", title: "Talus" },
+      { id: "foot-navicular", mesh: "l_navicular", index: "02", title: "Navicular" },
+      { id: "foot-calcaneus", mesh: "l_calcaneus", index: "03", title: "Calcaneus" },
+      { id: "foot-cuneiform", mesh: "l_medial_cuneiform", index: "04", title: "Medial cuneiform" },
+      { id: "foot-cuboid", mesh: "l_cuboid", index: "05", title: "Cuboid" },
+      { id: "foot-metatarsal3", mesh: "l_metatarsal_3", index: "06", title: "3rd metatarsal" },
+      { id: "foot-proximal", mesh: "l_proximal_phalange_1", index: "07", title: "Proximal phalanx" },
+      { id: "foot-sesamoids", mesh: "sesamoids", index: "08", title: "Sesamoids" },
     ],
   },
 ];
@@ -306,6 +338,7 @@ export function writeExplodeVector(
 }
 
 const tmpWorld = new THREE.Vector3();
+const tmpAnchor = new THREE.Vector3();
 
 // Mesh lookup cache — rebuilt only when a new groups object (or group key)
 // arrives, so the per-frame cost stays at a map lookup.
@@ -354,7 +387,16 @@ export function publishExplosionAnchors(
       continue;
     }
     node.updateWorldMatrix(true, false);
-    tmpWorld.copy(meshLocalCenter(node)).applyMatrix4(node.matrixWorld);
+    // The anchor rides the mesh's geometric center (plus any regional
+    // offset) through its current world transform — explosion included.
+    const mc = meshLocalCenter(node);
+    const ao = def.anchor;
+    tmpAnchor.set(
+      mc.x + (ao ? ao[0] : 0),
+      mc.y + (ao ? ao[1] : 0),
+      mc.z + (ao ? ao[2] : 0)
+    );
+    tmpWorld.copy(tmpAnchor).applyMatrix4(node.matrixWorld);
     tmpWorld.project(camera);
     st.anchors.push({
       x: (tmpWorld.x * 0.5 + 0.5) * width,
